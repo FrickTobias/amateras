@@ -2,7 +2,7 @@ import subprocess
 import sys
 import hashlib
 import pytest
-from amateras.cli.bigcellfinder import find_big_cells
+from amateras.cli.bigcellfinder import find_big_cells, find_short_path
 from amateras.__main__ import main as amateras_main
 
 # TODO: Test on image_slice_with_hair
@@ -11,6 +11,7 @@ PATH = "tests"
 IMAGE = PATH + "/img.tif"
 OUT_TMP = PATH + "/tmp"
 # From 2022-07-15 version 0.1.dev1+ga8edb5e
+PATH_STARTING_DIST = 20000 # Usually starts around 20,000
 XY_COORDINATES = [
     (313, 204), (415, 491), (390, 304), (364, 172), (86, 239), (193, 120), (135, 181),
     (63, 121), (435, 452), (282, 18), (94, 332), (313, 160), (89, 446), (15, 403),
@@ -52,8 +53,14 @@ def test_environment():
         subprocess.run(tool.split(" "), stderr=sys.stdout)
 
 
-def test_big_cell_finder(img=IMAGE, outdir=OUT_TMP):
-    xy_coordinates = find_big_cells(input=img, outdir=outdir, n_cells=100, qc=True)
+def test_big_cell_finder(img=IMAGE):
+    xy_coordinates = find_big_cells(input=img, n_cells=100)
     print(xy_coordinates)
     assert xy_coordinates == XY_COORDINATES
+    return
+
+
+def test_picking_path(coords=XY_COORDINATES):
+    _, distance = find_short_path(coords)
+    assert distance < (PATH_STARTING_DIST / 2)
     return

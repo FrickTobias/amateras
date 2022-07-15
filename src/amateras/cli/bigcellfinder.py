@@ -13,8 +13,8 @@ from collections import OrderedDict
 from collections import defaultdict
 import math
 import inspect
-import time
-from typing import Dict, List, Tuple
+from typing import List, Tuple
+from argparse import ArgumentTypeError
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
 
@@ -27,120 +27,109 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+ARG_MIN_VAL = 0
+ARG_MAX_VAL = 1
+
 def add_arguments(parser):
     parser.add_argument("input", help="input image")
 
     # TODO: Make optional and maybe just write coords
-    parser.add_argument("out", help="Output directory")
+    parser.add_argument("--qc-outdir", help="Output directory")
     parser.add_argument("--n-cells", type=int, default=20, help="Number of cells find.")
-    parser.add_argument("--qc", action="store_true", help="Runs QC steps")
+    parser.add_argument("--details", action="store_true", help="Writes extra files")
     parser.add_argument("--size-min", type=int, default=30,
                         help="Min size for cells. Default: %(default)s")
     parser.add_argument("--size-max", type=int, default=500,
                         help="Max size for cells. Default: %(default)s")
 
     # TODO: Add that some of these are between 0 and 1
-    parser.add_argument("--convexity-min", type=float, default=0.875,
+    parser.add_argument("--convexity-min", type=range_limited_float_type, default=0.875,
                         help="Min convexity for cells. Default: %(default)s")
-    parser.add_argument("--inertia-min", type=float, default=0.6, metavar="",
+    parser.add_argument("--inertia-min", type=range_limited_float_type, default=0.6, metavar="",
                         help="Min inertia for cells. Default: %(default)s")
 
     # TODO: Add arguments for final filtering
+    # TODO: Add argument for logfile writing
     return parser
 
 
 def main(args):
     big_cells = find_big_cells(
-        args.input, args.out, args.n_cells, args.qc, args.size_min, args.size_max,
+        args.input, args.n_cells, args.qc_outdir, args.details, args.size_min,
+        args.size_max,
         args.convexity_min, args.inertia_min
     )
-    print(big_cells)
+    big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
+    print(big_cells_ordered)
+    print(dist)
 
 
-def find_big_cells(input, outdir, n_cells: int, qc: bool = False, size_min: int = 30,
-                   size_max: int = 500, convexity_min: float = 0.875,
-                   inertia_min: float = 0.6):
-    timer = Timer()
-
-    timer.start(lap_name="open file")
+def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
+                   size_min: int = 30, size_max: int = 500,
+                   convexity_min: float = 0.875, inertia_min: float = 0.6):
     logger.info("Opening file")
     input_img = cv2.imread(input)
 
-    timer.lap(next_lap_name="setting up")
-    logger.info("Setting up")
-    mkdir(outdir)
+    if qc_outdir:
+        logger.info("Setting up")
+        mkdir(qc_outdir)
+        function_name = inspect.stack()[0][3]
+        if details:
+            mkdir(f"{qc_outdir}/rejections")
+            mkdir(f"{qc_outdir}/center-contours")
 
     # Add to img
     out = input_img.copy()
     out_big_cells = input_img.copy()
 
-    qc = qc
-    function_name = inspect.stack()[0][3]
-    if qc:
-        mkdir(f"{outdir}/rejections")
-        mkdir(f"{outdir}/center-contours")
-
     # Remove huge objects
-    timer.lap(next_lap_name="mask dust")
     logger.info("Masking dust")
-    out = mask_dust(out, thresh_min=60, min_size=4000, qc=qc, outdir=outdir)
+    out = mask_dust(out, thresh_min=60, min_size=4000, details=details, qc_outdir=qc_outdir)
 
     # Detect cells
-    timer.lap(next_lap_name="cell det.")
     logger.info("Detecting cells")
-    cell_contours = cell_detector_2(out, qc=qc, outdir=outdir)
+    cell_contours = cell_detector_2(out, details=details, qc_outdir=qc_outdir)
 
     # Write to terminal
     detected_cells = len(cell_contours)
-    if qc:
-        timer.lap(next_lap_name="cell est.")
-        logger.info("Estimating cells")
-        tot_estimate_cnt = white_dot_detector(out, size_min=1, size_max=20, qc=qc,
-                                              outdir=out)
-        total_cells_estimate = len(tot_estimate_cnt)
-        detection_rate = round(detected_cells / total_cells_estimate * 100, 2)
-        logger.info(f"Estimate total cells: {total_cells_estimate}")
-        logger.info(f"Detected: {detected_cells} ({detection_rate}%)")
-    else:
-        logger.info(f"Detected: {detected_cells}")
+    logger.info(f"Detected: {detected_cells}")
 
     # Size filters
-    timer.lap(next_lap_name="cell filt")
     logger.info("Filtering cells")
     cell_contours_sfilt = filter_by_area(cell_contours, size_min=size_min,
                                          size_max=size_max)
     sfilt_cells = len(cell_contours_sfilt)
-    logger.info(f"{size_min} < size < {size_max}: {sfilt_cells}")
+    logger.info(f"{size_min} < Size < {size_max}: {sfilt_cells}")
 
     # Inertia filters
     cell_contours_sfilt_ifilt = filter_by_inertia(
         cell_contours_sfilt, threshold=inertia_min, keep_NA=True
     )
     sfilt_ifilt_cells = len(cell_contours_sfilt_ifilt)
-    logger.info(f"inertia > {inertia_min}: {sfilt_ifilt_cells}")
+    logger.info(f"Inertia > {inertia_min}: {sfilt_ifilt_cells}")
 
     # convexity filters
     cell_contours_final = filter_for_convexity(
         cell_contours_sfilt_ifilt, convexity_threshold=convexity_min, keep_NA=True
     )
     cfilt_cells = len(cell_contours_final)
-    logger.info(f"convexity > {convexity_min}: {cfilt_cells} (green)")
+    logger.info(f"Convexity > {convexity_min}: {cfilt_cells} (green)")
 
     # TODO: Filter on circularity (maybe)
     # TODO: Filter on n_cells in mask
 
-    # Save areas to histogram
-    timer.lap(next_lap_name="histogram")
-    logger.info("Making histogram")
     areas = [cv2.contourArea(a) for a in cell_contours_final]
-    save_histogram(areas, f"{outdir}/histogram.png", bins=range(0, 500, 10),
-                   title=f"AMATERAS cell areas, {size_min}<size<{size_max}, "
-                         f"inrt>{inertia_min}, cxt>{convexity_min}",
-                   x_axis="area", x_unit="px",
-                   y_axis="count", y_unit="")
+
+    # Save areas to histogram
+    if qc_outdir:
+        logger.info("Making histogram")
+        save_histogram(areas, f"{qc_outdir}/histogram.png", bins=range(0, 500, 10),
+                       title=f"AMATERAS cell areas, {size_min}<size<{size_max}, "
+                             f"inrt>{inertia_min}, cxt>{convexity_min}",
+                       x_axis="area", x_unit="px",
+                       y_axis="count", y_unit="")
 
     # Set up dataframe for finding proximal cells
-    timer.lap(next_lap_name="dataframe")
     logger.info("Making dataframes for biggest cell detections")
     all_cell_centroids = [cnt_centroid(c) for c in cell_contours_sfilt]
     cf = CentroidFinder(all_cell_centroids)
@@ -163,7 +152,6 @@ def find_big_cells(input, outdir, n_cells: int, qc: bool = False, size_min: int 
     dfsort_cont = dfsort.contour.tolist()
 
     # Loop through centroids and find biggest cells
-    timer.lap(next_lap_name="find big")
     logger.info(f"Locating the {n_cells} biggest cells")
     good_cells = 0
     big_cells = list()
@@ -177,14 +165,15 @@ def find_big_cells(input, outdir, n_cells: int, qc: bool = False, size_min: int 
 
         # Filter one last time
         filter_pass = final_qc_filtering(
-            center_contours, candidate_no=i, cell_img=cell_raw, qc=qc, outdir=outdir
+            center_contours, candidate_no=i, cell_img=cell_raw, details=details,
+            qc_outdir=qc_outdir
         )
 
-        if qc:
+        if qc_outdir and details:
             out_cnt = cell_raw.copy()
             out_cnt = cv2.drawContours(out_cnt, center_contours, -1, (50, 255, 50), -1)
-            cv2.imwrite(f"{outdir}/center-contours/candidate-{i}-raw.tif", cell_raw)
-            cv2.imwrite(f"{outdir}/center-contours/candidate-{i}-cnt.tif", out_cnt)
+            cv2.imwrite(f"{qc_outdir}/center-contours/candidate-{i}-raw.tif", cell_raw)
+            cv2.imwrite(f"{qc_outdir}/center-contours/candidate-{i}-cnt.tif", out_cnt)
 
         if filter_pass:
             # Find and mark proximal cells in output
@@ -215,7 +204,6 @@ def find_big_cells(input, outdir, n_cells: int, qc: bool = False, size_min: int 
                 break
 
     # Adding contours to output
-    timer.lap(next_lap_name="cnt to img")
     logger.info("Adding contours to image")
     out = cv2.drawContours(out, cell_contours, -1, (200, 200, 200), 1)
     out = cv2.drawContours(out, cell_contours_sfilt, -1, (75, 75, 175), 1)
@@ -224,19 +212,14 @@ def find_big_cells(input, outdir, n_cells: int, qc: bool = False, size_min: int 
                               add_centroid=True, color=(50, 255, 50))
 
     # Write output
-    timer.lap(next_lap_name="write img")
-    logger.info("Writing final file")
-    cv2.imwrite(f"{outdir}/detections-and-{n_cells}-biggest-cells.tif", out)
-    cv2.imwrite(f"{outdir}/{n_cells}-biggest-cells.tif", out_big_cells)
-    if qc:
-        timer.lap(next_lap_name="write qc out")
-        logger.info("Writing QC outputs")
-        cv2.imwrite(f"{outdir}/{function_name}.input.tif", input_img)
+    if qc_outdir:
+        logger.info("Writing final file")
+        cv2.imwrite(f"{qc_outdir}/detections-and-{n_cells}-biggest-cells.tif", out)
+        cv2.imwrite(f"{qc_outdir}/{n_cells}-biggest-cells.tif", out_big_cells)
+        if details:
+            logger.info("Writing QC outputs")
+            cv2.imwrite(f"{qc_outdir}/{function_name}.input.tif", input_img)
 
-    timer.stop()
-    print(f"\nTimer summary:\n{timer.summary()}")
-
-    # TODO: Find shortest path
     return big_cells
 
 
@@ -254,7 +237,7 @@ def add_distances_to_img(img, p1, p2):
 
 def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float = 0.6,
                        convexity_thresh: float = 0.8, circularity: float = 0.7,
-                       cell_img=None, qc: bool = False, outdir=None):
+                       cell_img=None, details: bool = False, qc_outdir=None):
     # Inits
     filter_fails = defaultdict(bool)
     # function_name = inspect.stack()[0][3]
@@ -292,11 +275,11 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
             filter_fails[f"circularity-under-{circularity}"] = True
 
     # Write rejected to output
-    if qc:
+    if details:
         reasons = [reason for reason, filter_fail in filter_fails.items() if
                    filter_fail is True]
         cv2.imwrite(
-            f"{outdir}/rejections/candidate-{candidate_no}.{'.'.join(reasons)}.tif",
+            f"{qc_outdir}/rejections/candidate-{candidate_no}.{'.'.join(reasons)}.tif",
             cell_img
         )
 
@@ -311,7 +294,7 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
 
 def mask_dust(img, thresh_min: int = 60, thresh_max: int = 255, min_size: int = 4000,
               blurring_kernel: int = 11, erosion_kernel_number: int = 5,
-              erosion_iterations: int = 3, qc: bool = False, outdir=None):
+              erosion_iterations: int = 3, details: bool = False, qc_outdir=None):
     # Convert to gray for analysis
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -341,20 +324,20 @@ def mask_dust(img, thresh_min: int = 60, thresh_max: int = 255, min_size: int = 
     # Mask image
     out = img.copy()
     masked = cv2.bitwise_and(out, mask_inv)
-    if qc:
+    if qc_outdir and details:
         function_name = inspect.stack()[0][3]
-        cv2.imwrite(f"{outdir}/{function_name}.1-input.tif", img)
-        cv2.imwrite(f"{outdir}/{function_name}.2-blurred_median.tif", blurred_median)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.1-input.tif", img)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.2-blurred_median.tif", blurred_median)
         cv2.imwrite(
-            f"{outdir}/{function_name}.3-blurred-inrange-{lower}-{upper}.tif", inrange
+            f"{qc_outdir}/{function_name}.3-blurred-inrange-{lower}-{upper}.tif", inrange
         )
-        cv2.imwrite(f"{outdir}/{function_name}.4-erosion.tif", erosion)
-        cv2.imwrite(f"{outdir}/{function_name}.5-huge-hairs-mask.tif", mask_inv)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.4-erosion.tif", erosion)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.5-huge-hairs-mask.tif", mask_inv)
     return masked
 
 
 def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: int = 70,
-                    white_thresh: int = 125, qc: bool = False, outdir=None):
+                    white_thresh: int = 125, details: bool = False, qc_outdir=None):
     # Find black spots
     blurred = cv2.blur(img, blur_kernel)
     blurred_gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
@@ -371,18 +354,18 @@ def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: in
     # Get contours of masked imagee
     contours, _ = cv2.findContours(combined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    if qc:
+    if qc_outdir and details:
         # show results
         function_name = inspect.stack()[0][3]
-        cv2.imwrite(f"{outdir}/{function_name}.1-input.tif", img)
-        cv2.imwrite(f"{outdir}/{function_name}.2-blurred.tif", blurred)
-        cv2.imwrite(f"{outdir}/{function_name}.3-black-thresh.tif", black_thresh_inv)
-        cv2.imwrite(f"{outdir}/{function_name}.4-white-thresh.tif", white_thresh)
-        cv2.imwrite(f"{outdir}/{function_name}.5-combined-thresh.tif", combined)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.1-input.tif", img)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.2-blurred.tif", blurred)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.3-black-thresh.tif", black_thresh_inv)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.4-white-thresh.tif", white_thresh)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.5-combined-thresh.tif", combined)
 
         img_show = img.copy()
         cv2.drawContours(img_show, contours, -1, (50, 255, 50), 1)
-        cv2.imwrite(f"{outdir}/{function_name}.6-contours.tif", img_show)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.6-contours.tif", img_show)
 
     return contours
 
@@ -595,38 +578,25 @@ def color_histogram(grayImage, thresholdImage):
     plt.show()
 
 
-def white_dot_detector(img, size_min: int = 1, size_max: int = 20,
-                       thresh_min: int = 100, thresh_max: int = 130, qc: bool = False,
-                       outdir=None):
-    # Prep img
-    grayscaled = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(grayscaled, thresh_min, thresh_max, cv2.THRESH_BINARY)
+def find_short_path(coords, qc_outdir=None):
 
-    # Find contours
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE,
-                                           cv2.CHAIN_APPROX_SIMPLE)
-
-    # filter by area
-    xcnts = []
-    for cnt in contours:
-        if size_min < cv2.contourArea(cnt) < size_max:
-            xcnts.append(cnt)
-
-    if qc:
-        out = img.copy()
-        out = cv2.drawContours(out, xcnts, -1, (50, 255, 50), 1)
-        function_name = inspect.stack()[0][3]
-        cv2.imwrite(f"{outdir}/{function_name}.1-input.tif", img)
-        cv2.imwrite(f"{outdir}/{function_name}.2-contours.tif", out)
-    return xcnts
-
-
-def find_short_path(coords: List[int]):
+    logger.info("Finding short path in between points")
     distance_matrix = tsp_dist_matrix(coords, tsp_is_open=True)
     logging.getLogger("python_tsp.heuristics.local_search").setLevel(logging.WARNING)
-    permutation, _ = solve_tsp_local_search(distance_matrix)
+    permutation, distance = solve_tsp_local_search(distance_matrix)
+    ordered_coords = [coords[p] for p in permutation]
 
-    return coords[permutation]
+    # Write plot with points and path
+    if qc_outdir:
+        ordered_data = np.array(ordered_coords)
+        plt.scatter(ordered_data[:, 0], ordered_data[:, 1], color="r")
+        plt.plot(ordered_data[:, 0], ordered_data[:, 1])
+        plt.scatter(ordered_data[0, 0], ordered_data[0, 1], color="b")
+        plt.text(ordered_data[0, 0], ordered_data[0, 1], "start")
+        plt.gca().invert_yaxis()
+        plt.savefig(f"{qc_outdir}/picking-path.png")
+
+    return ordered_coords, distance
 
 
 def tsp_dist_matrix(coords, tsp_is_open: bool = False):
@@ -636,46 +606,17 @@ def tsp_dist_matrix(coords, tsp_is_open: bool = False):
     return distance_matrix
 
 
-class Timer():
-
-    def __init__(self, decimals: int = 3):
-        self.laps: Dict[str, float] = OrderedDict()
-        self.lap_name = ""
-        self.decimals = decimals
-        self.lap_counter = 0
-
-    def start(self, lap_name: str = ""):
-        self.t_start = time.time()
-        if lap_name != "":
-            self.lap_name = str(self.lap_counter)
-        else:
-            self.lap_name = lap_name
-        return self.t_start
-
-    def lap(self, next_lap_name: str = ""):
-        t_start = self.t_start
-        lap_name = self.lap_name
-        lap_t = self.start(next_lap_name)
-        delta_t = lap_t - t_start
-        self.laps[lap_name] = round(delta_t, self.decimals)
-        self.lap_counter += 1
-        return round(delta_t, self.decimals)
-
-    def stop(self):
-        lap_t = time.time()
-        delta_t = lap_t - self.t_start
-        self.laps[self.lap_name] = round(delta_t, self.decimals)
-        return round(delta_t, self.decimals)
-
-    def summary(self):
-        s = str()
-        t_tot = sum(self.laps.values())
-        for lap_name, lap_time in self.laps.items():
-            t_frac = lap_time / t_tot * 100
-            s += f"{lap_name}:\t{lap_time}s\t\t{round(t_frac)} %\n"
-        s += " " * 2 + "-" * 32 + " " * 2 + "\n"
-        s += f"total time:\t{round(t_tot, self.decimals)}s\t\t100 %\n"
-        return s
+def range_limited_float_type(arg):
+    """ Type function for argparse - a float within some predefined bounds """
+    try:
+        f = float(arg)
+    except ValueError:
+        raise ArgumentTypeError("Must be a floating point number")
+    if f < ARG_MIN_VAL or f >= ARG_MAX_VAL:
+        raise ArgumentTypeError(
+            f"Argument must be within [{str(ARG_MIN_VAL)}, {str(ARG_MAX_VAL)})"
+        )
+    return f
 
 
 class CentroidFinder():

@@ -3,3 +3,29 @@
 # AMATERAS
 
 Image analysis for AMATERAS microscope
+
+## Setup
+
+    git clone https://github.com/FrickTobias/amateras.git
+    cd amateras
+    pip install -e .
+
+## Usage
+
+    amateras bigcellfinder -h
+
+## Examples
+
+Minimal
+
+    amateras bigcellfinder tests/img.tif --n-cells 100 > ~/Desktop/positions.txt
+
+Write qc output
+
+    amateras bigcellfinder tests/img.tif --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output > ~/Desktop/positions.txt
+
+Include details of all steps in analysis
+
+    amateras bigcellfinder tests/img.tif --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output --details > ~/Desktop/positions.txt
+
+    
