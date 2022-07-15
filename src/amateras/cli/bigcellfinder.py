@@ -622,7 +622,7 @@ def range_limited_float_type(arg):
 
 class CentroidFinder():
 
-    def __init__(self, centroids: List[List[int]]):
+    def __init__(self, centroids):
         # TODO: Rewrite this so we don't have to make a dict in between
         tmp_dict = OrderedDict()
         tmp_dict["centroid"] = centroids
