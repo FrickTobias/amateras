@@ -217,9 +217,28 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
         logger.info("Writing final file")
         cv2.imwrite(f"{qc_outdir}/detections-and-{n_cells}-biggest-cells.tif", out)
         cv2.imwrite(f"{qc_outdir}/{n_cells}-biggest-cells.tif", out_big_cells)
+
+        logger.info("Finding picking path (only for example image)")
+        ordered_big_cells, _ = find_short_path(big_cells)
+        out_picking_path = out.copy()
+        for point1, point2 in zip(ordered_big_cells, ordered_big_cells[1:]):
+            out_picking_path = cv2.line(
+                out_picking_path, point1, point2, [125, 255, 50], 2
+            )
+        tX, tY = ordered_big_cells[0]
+        tX -= 20
+        tY -= 60
+        out_picking_path = cv2.putText(
+            out_picking_path, "start", (tX, tY), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+            (125, 255, 50), 2
+        )
+
+        cv2.imwrite(f"{qc_outdir}/{function_name}.picking-path-example.tif", out_picking_path)
+
         if details:
             logger.info("Writing QC outputs")
             cv2.imwrite(f"{qc_outdir}/{function_name}.input.tif", input_img)
+
 
     return big_cells
 
@@ -595,7 +614,7 @@ def find_short_path(coords, qc_outdir=None):
         plt.scatter(ordered_data[0, 0], ordered_data[0, 1], color="b")
         plt.text(ordered_data[0, 0], ordered_data[0, 1], "start")
         plt.gca().invert_yaxis()
-        plt.savefig(f"{qc_outdir}/picking-path.png")
+        plt.savefig(f"{qc_outdir}/actual-picking-path.png")
 
     return ordered_coords, distance
 
