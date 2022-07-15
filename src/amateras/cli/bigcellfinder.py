@@ -26,9 +26,9 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
 ARG_MIN_VAL = 0
 ARG_MAX_VAL = 1
+
 
 def add_arguments(parser):
     parser.add_argument("input", help="input image")
@@ -45,7 +45,8 @@ def add_arguments(parser):
     # TODO: Add that some of these are between 0 and 1
     parser.add_argument("--convexity-min", type=range_limited_float_type, default=0.875,
                         help="Min convexity for cells. Default: %(default)s")
-    parser.add_argument("--inertia-min", type=range_limited_float_type, default=0.6, metavar="",
+    parser.add_argument("--inertia-min", type=range_limited_float_type, default=0.6,
+                        metavar="",
                         help="Min inertia for cells. Default: %(default)s")
 
     # TODO: Add arguments for final filtering
@@ -83,7 +84,8 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     # Remove huge objects
     logger.info("Masking dust")
-    out = mask_dust(out, thresh_min=60, min_size=4000, details=details, qc_outdir=qc_outdir)
+    out = mask_dust(out, thresh_min=60, min_size=4000, details=details,
+                    qc_outdir=qc_outdir)
 
     # Detect cells
     logger.info("Detecting cells")
@@ -328,7 +330,8 @@ def mask_dust(img, thresh_min: int = 60, thresh_max: int = 255, min_size: int = 
         cv2.imwrite(f"{qc_outdir}/{function_name}.1-input.tif", img)
         cv2.imwrite(f"{qc_outdir}/{function_name}.2-blurred_median.tif", blurred_median)
         cv2.imwrite(
-            f"{qc_outdir}/{function_name}.3-blurred-inrange-{lower}-{upper}.tif", inrange
+            f"{qc_outdir}/{function_name}.3-blurred-inrange-{lower}-{upper}.tif",
+            inrange
         )
         cv2.imwrite(f"{qc_outdir}/{function_name}.4-erosion.tif", erosion)
         cv2.imwrite(f"{qc_outdir}/{function_name}.5-huge-hairs-mask.tif", mask_inv)
@@ -578,7 +581,6 @@ def color_histogram(grayImage, thresholdImage):
 
 
 def find_short_path(coords, qc_outdir=None):
-
     logger.info("Finding short path in between points")
     distance_matrix = tsp_dist_matrix(coords, tsp_is_open=True)
     logging.getLogger("python_tsp.heuristics.local_search").setLevel(logging.WARNING)

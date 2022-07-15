@@ -11,7 +11,7 @@ PATH = "tests"
 IMAGE = PATH + "/img.tif"
 OUT_TMP = PATH + "/tmp"
 # From 2022-07-15 version 0.1.dev1+ga8edb5e
-PATH_STARTING_DIST = 20000 # Usually starts around 20,000
+PATH_STARTING_DIST = 20000  # Usually starts around 20,000
 XY_COORDINATES = [
     (313, 204), (415, 491), (390, 304), (364, 172), (86, 239), (193, 120), (135, 181),
     (63, 121), (435, 452), (282, 18), (94, 332), (313, 160), (89, 446), (15, 403),
