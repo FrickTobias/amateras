@@ -53,7 +53,7 @@ def test_environment():
 
 
 def test_big_cell_finder(img=IMAGE, outdir=OUT_TMP):
-    xy_coordinates = find_big_cells(input=img, outdir=outdir, n_cells=100)
+    xy_coordinates = find_big_cells(input=img, outdir=outdir, n_cells=100, qc=True)
     print(xy_coordinates)
     assert xy_coordinates == XY_COORDINATES
     return

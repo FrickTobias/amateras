@@ -14,6 +14,7 @@ from collections import defaultdict
 import math
 import inspect
 import time
+from typing import Dict, List, Tuple
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
 
@@ -352,7 +353,7 @@ def mask_dust(img, thresh_min: int = 60, thresh_max: int = 255, min_size: int = 
     return masked
 
 
-def cell_detector_2(img, blur_kernel: tuple = (3, 3), black_thresh: int = 70,
+def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: int = 70,
                     white_thresh: int = 125, qc: bool = False, outdir=None):
     # Find black spots
     blurred = cv2.blur(img, blur_kernel)
@@ -386,7 +387,7 @@ def cell_detector_2(img, blur_kernel: tuple = (3, 3), black_thresh: int = 70,
     return contours
 
 
-def cell_center_detector(roi, contour, cnt_start: tuple = (0, 0)):
+def cell_center_detector(roi, contour, cnt_start: Tuple[int, int] = (0, 0)):
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
     # Make mask from contour (otherwise cnt detection will find areas outside cell)
@@ -524,7 +525,8 @@ def filter_for_convexity(contours, convexity_threshold: float = 0.9,
 
 
 def add_contours_to_img(img, contours, add_centroid: bool = False,
-                        add_area: bool = False, color: tuple = (255, 255, 255)):
+                        add_area: bool = False,
+                        color: Tuple[int, int, int] = (255, 255, 255)):
     # Draw contours
     out = img.copy()
     out = cv2.drawContours(out, contours, -1, color, 1)
@@ -554,9 +556,8 @@ def add_contours_to_img(img, contours, add_centroid: bool = False,
     return out
 
 
-def save_histogram(data: list, file_name: str, bins: range, title=None, x_axis=None,
-                   x_unit=None,
-                   y_axis=None, y_unit=None):
+def save_histogram(data: List[int], file_name: str, bins: range, title=None,
+                   x_axis=None, x_unit=None, y_axis=None, y_unit=None):
     ar = np.array(data)
     fig, ax = plt.subplots(figsize=(10, 7))
     ax.hist(ar, bins=bins)
@@ -620,7 +621,7 @@ def white_dot_detector(img, size_min: int = 1, size_max: int = 20,
     return xcnts
 
 
-def find_short_path(coords: list):
+def find_short_path(coords: List[int]):
     distance_matrix = tsp_dist_matrix(coords, tsp_is_open=True)
     logging.getLogger("python_tsp.heuristics.local_search").setLevel(logging.WARNING)
     permutation, _ = solve_tsp_local_search(distance_matrix)
@@ -638,20 +639,20 @@ def tsp_dist_matrix(coords, tsp_is_open: bool = False):
 class Timer():
 
     def __init__(self, decimals: int = 3):
-        self.laps = OrderedDict()
-        self.lap_name = 0
+        self.laps: Dict[str, float] = OrderedDict()
+        self.lap_name = ""
         self.decimals = decimals
         self.lap_counter = 0
 
-    def start(self, lap_name: str = None):
+    def start(self, lap_name: str = ""):
         self.t_start = time.time()
-        if lap_name is None:
-            self.lap_name = self.lap_counter
+        if lap_name != "":
+            self.lap_name = str(self.lap_counter)
         else:
             self.lap_name = lap_name
         return self.t_start
 
-    def lap(self, next_lap_name: str = None):
+    def lap(self, next_lap_name: str = ""):
         t_start = self.t_start
         lap_name = self.lap_name
         lap_t = self.start(next_lap_name)
@@ -679,7 +680,7 @@ class Timer():
 
 class CentroidFinder():
 
-    def __init__(self, centroids: list):
+    def __init__(self, centroids: List[List[int]]):
         # TODO: Rewrite this so we don't have to make a dict in between
         tmp_dict = OrderedDict()
         tmp_dict["centroid"] = centroids
@@ -689,7 +690,7 @@ class CentroidFinder():
 
         self.centroid_df = pd.DataFrame(tmp_dict)
 
-    def find_proximals(self, centroid: tuple, search_window: int = 40):
+    def find_proximals(self, centroid: Tuple[int, int], search_window: int = 40):
         cX, cY = centroid
         sX1, sY1 = cX - search_window, cY - search_window
         sX2, sY2 = cX + search_window, cY + search_window

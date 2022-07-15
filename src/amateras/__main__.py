@@ -6,6 +6,7 @@ import logging
 import pkgutil
 import importlib
 import timeit
+from typing import Optional
 from argparse import ArgumentParser
 
 import amateras.cli as cli_package
