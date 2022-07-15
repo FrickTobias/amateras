@@ -233,12 +233,12 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
             (125, 255, 50), 2
         )
 
-        cv2.imwrite(f"{qc_outdir}/{function_name}.picking-path-example.tif", out_picking_path)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.picking-path-example.tif",
+                    out_picking_path)
 
         if details:
             logger.info("Writing QC outputs")
             cv2.imwrite(f"{qc_outdir}/{function_name}.input.tif", input_img)
-
 
     return big_cells
 
