@@ -61,7 +61,6 @@ def main(args):
     )
     big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
     print(big_cells_ordered)
-    print(dist)
 
 
 def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
