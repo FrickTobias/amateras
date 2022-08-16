@@ -1,5 +1,16 @@
 import cv2
+from matplotlib import pyplot as plt
 import numpy as np
+import logging
+import shutil
+import os
+from argparse import ArgumentTypeError
+
+logger = logging.getLogger(__name__)
+
+ARG_MIN_VAL = 0
+ARG_MAX_VAL = 1
+
 
 # TODO: Do this for image
 def color_histogram(grayImage, thresholdImage):
@@ -15,6 +26,20 @@ def color_histogram(grayImage, thresholdImage):
     plt.savefig('fig1.png')
     plt.show()
 
+
+def range_limited_float_type(arg):
+    """ Type function for argparse - a float within some predefined bounds """
+    try:
+        f = float(arg)
+    except ValueError:
+        raise ArgumentTypeError("Must be a floating point number")
+    if f < ARG_MIN_VAL or f >= ARG_MAX_VAL:
+        raise ArgumentTypeError(
+            f"Argument must be within [{str(ARG_MIN_VAL)}, {str(ARG_MAX_VAL)})"
+        )
+    return f
+
+
 def mkdir(path, verbose=False):
     if not os.path.isdir(path):
         if verbose:
@@ -25,7 +50,6 @@ def mkdir(path, verbose=False):
             logger.info(f"recreating {path}")
         shutil.rmtree(path)
         os.mkdir(path)
-
 
 
 def cnt_convexity(cnt):
@@ -71,19 +95,6 @@ def cnt_centroid(cnt):
     cY = int(M["m01"] / M["m00"])
     c = (cX, cY)
     return c
-
-
-def cnt_principal_axis(contours):
-    principals = list()
-    for cnt in contours:
-        if len(cnt) < 5:
-            continue
-        e = cv2.fitEllipse(cnt)
-        c = cnt_centroid(cnt)
-        pa = ellipse_principal_axis(c, e)
-        principals.append(pa)
-
-    return principals
 
 
 def filter_by_area(contours, size_min: int = 10, size_max: int = 500):

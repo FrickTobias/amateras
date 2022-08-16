@@ -8,7 +8,6 @@ import numpy as np
 import os
 import shutil
 import matplotlib.pyplot as plt
-from collections import defaultdict
 from tqdm import tqdm
 from typing import Tuple
 from amateras import utils
@@ -40,15 +39,16 @@ def add_arguments(parser):
                         help="Max size for cells. Default: %(default)s")
 
     # TODO: Add that some of these are between 0 and 1
-    parser.add_argument("--convexity-min", type=range_limited_float_type, default=0.875,
+    parser.add_argument("--convexity-min", type=utils.range_limited_float_type,
+                        default=0.875,
                         help="Min convexity for cells. Default: %(default)s")
-    parser.add_argument("--inertia-min", type=range_limited_float_type, default=0.6,
+    parser.add_argument("--inertia-min", type=utils.range_limited_float_type,
+                        default=0.6,
                         metavar="",
                         help="Min inertia for cells. Default: %(default)s")
 
     # TODO: Add arguments for final filtering
     # TODO: Add argument for logfile writing
-
 
     return parser
 
@@ -62,7 +62,6 @@ def main(args):
 
 
 def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
-
     logger.info("Opening file")
     img = cv2.imread(input)
 
@@ -90,7 +89,7 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
 
     # size filt
     contours_afilt = utils.filter_by_area(contours, size_min=size_min,
-                                    size_max=size_max)
+                                          size_max=size_max)
     logger.info(f"{size_min} < Size < {size_max}: {len(contours_afilt)}")
     # inertia filt
     contours_afilt_ifilt = utils.filter_by_inertia(
@@ -135,7 +134,6 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
         magnitudes.append(magnitude)
         intensities.append(intesity)
 
-
     logger.info("Finding highest intesity signals")
 
     intensities_array = np.array(intensities, dtype=float)
@@ -146,20 +144,24 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
     intensities_sorted = intensities_array[sort_index]
 
     centroids = []
-    for i, (cnt, intensity) in enumerate(zip(contours_final_sorted, intensities_sorted)):
+    for i, (cnt, intensity) in enumerate(
+            zip(contours_final_sorted, intensities_sorted)):
         bbox = cv2.boundingRect(cnt)
         x, y, w, h = bbox
-        cv2.rectangle(img_mod, (x, y), (x+w, y+h), (50, 50, 255), 1)
-        cv2.putText(img_mod, f"{i}: {round(intensity, 2)}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
+        cv2.rectangle(img_mod, (x, y), (x + w, y + h), (50, 50, 255), 1)
+        cv2.putText(img_mod, f"{i}: {round(intensity, 2)}", (x, y - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
         centroids.append(utils.cnt_centroid(cnt))
 
         # Marking high intensity cells
         cv2.putText(
-            img_mod, f"high int: {i}", (x+w//2, y+h//2-5), cv2.FONT_HERSHEY_SIMPLEX,
+            img_mod, f"high int: {i}", (x + w // 2, y + h // 2 - 5),
+            cv2.FONT_HERSHEY_SIMPLEX,
             0.4, (50, 50, 255), 1
         )
         img_mod = cv2.rectangle(
-            img_mod, (x+w//2-40, y+h//2-40), (x+w//2+40, y+h//2+40), (50, 50, 255), 5
+            img_mod, (x + w // 2 - 40, y + h // 2 - 40),
+            (x + w // 2 + 40, y + h // 2 + 40), (50, 50, 255), 5
         )
 
     logger.info("Writing output")
@@ -175,7 +177,6 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
         plt.ylabel("count []")
         plt.xlabel("intensity [lx/px]")
         plt.savefig(f"{qc_outdir}/intesities-historam.png")
-
 
         logger.info("Finding picking path (only for example image)")
         ordered_centroids, _ = find_short_path(centroids)
@@ -293,30 +294,6 @@ def cnt_centroid(cnt):
     return c
 
 
-def cnt_principal_axis(contours):
-    principals = list()
-    for cnt in contours:
-        if len(cnt) < 5:
-            continue
-        e = cv2.fitEllipse(cnt)
-        c = cnt_centroid(cnt)
-        pa = ellipse_principal_axis(c, e)
-        principals.append(pa)
-
-    return principals
-
-
-def ellipse_principal_axis(centroid, ellipse):
-    e = ellipse
-    cx, cy = centroid
-    x1 = int(np.round(cx + e[1][1] / 2 * np.cos((e[2] + 90) * np.pi / 180.0)))
-    y1 = int(np.round(cy + e[1][1] / 2 * np.sin((e[2] + 90) * np.pi / 180.0)))
-    x2 = int(np.round(cx + e[1][1] / 2 * np.cos((e[2] - 90) * np.pi / 180.0)))
-    y2 = int(np.round(cy + e[1][1] / 2 * np.sin((e[2] - 90) * np.pi / 180.0)))
-    pa = ((x1, y1), (x2, y2))
-    return pa
-
-
 def middlepoint(p1, p2):
     middlepoint = []
     for i in range(len(p1)):
@@ -340,19 +317,6 @@ def find_short_path(coords, qc_outdir=None):
     ordered_coords = [coords[p] for p in permutation]
 
     return ordered_coords, distance
-
-
-def range_limited_float_type(arg):
-    """ Type function for argparse - a float within some predefined bounds """
-    try:
-        f = float(arg)
-    except ValueError:
-        raise ArgumentTypeError("Must be a floating point number")
-    if f < ARG_MIN_VAL or f >= ARG_MAX_VAL:
-        raise ArgumentTypeError(
-            f"Argument must be within [{str(ARG_MIN_VAL)}, {str(ARG_MAX_VAL)})"
-        )
-    return f
 
 
 def tsp_dist_matrix(coords, tsp_is_open: bool = False):

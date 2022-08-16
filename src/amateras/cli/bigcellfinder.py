@@ -15,7 +15,6 @@ import math
 import inspect
 from amateras import utils
 from typing import List, Tuple
-from argparse import ArgumentTypeError
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
 
@@ -26,9 +25,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-ARG_MIN_VAL = 0
-ARG_MAX_VAL = 1
 
 
 def add_arguments(parser):
@@ -44,9 +40,11 @@ def add_arguments(parser):
                         help="Max size for cells. Default: %(default)s")
 
     # TODO: Add that some of these are between 0 and 1
-    parser.add_argument("--convexity-min", type=range_limited_float_type, default=0.875,
+    parser.add_argument("--convexity-min", type=utils.range_limited_float_type,
+                        default=0.875,
                         help="Min convexity for cells. Default: %(default)s")
-    parser.add_argument("--inertia-min", type=range_limited_float_type, default=0.6,
+    parser.add_argument("--inertia-min", type=utils.range_limited_float_type,
+                        default=0.6,
                         metavar="",
                         help="Min inertia for cells. Default: %(default)s")
 
@@ -98,8 +96,9 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     # Size filters
     logger.info("Filtering cells")
-    cell_contours_sfilt = utils.filter_by_area(cell_contours, size_min=size_min,
-                                         size_max=size_max)
+    cell_contours_sfilt = utils.filter_by_area(
+        cell_contours, size_min=size_min, size_max=size_max
+    )
     sfilt_cells = len(cell_contours_sfilt)
     logger.info(f"{size_min} < Size < {size_max}: {sfilt_cells}")
 
@@ -492,7 +491,8 @@ def middlepoint(p1, p2):
         middlepoint.append(middle)
     return middlepoint
 
-#def filter_by_inertia(contours, threshold: float = 0.01, keep_NA: bool = False):
+
+# def filter_by_inertia(contours, threshold: float = 0.01, keep_NA: bool = False):
 #    filtered = list()
 #    for cnt in contours:
 #        inertia = utils.cnt_inertia(cnt)
@@ -506,7 +506,7 @@ def middlepoint(p1, p2):
 #    return filtered
 #
 #
-#def filter_for_convexity(contours, convexity_threshold: float = 0.9,
+# def filter_for_convexity(contours, convexity_threshold: float = 0.9,
 #                         keep_NA: bool = False):
 #    filtered = list()
 #    for cnt in contours:
@@ -601,19 +601,6 @@ def tsp_dist_matrix(coords, tsp_is_open: bool = False):
     if tsp_is_open:
         distance_matrix[:, 0] = 0
     return distance_matrix
-
-
-def range_limited_float_type(arg):
-    """ Type function for argparse - a float within some predefined bounds """
-    try:
-        f = float(arg)
-    except ValueError:
-        raise ArgumentTypeError("Must be a floating point number")
-    if f < ARG_MIN_VAL or f >= ARG_MAX_VAL:
-        raise ArgumentTypeError(
-            f"Argument must be within [{str(ARG_MIN_VAL)}, {str(ARG_MAX_VAL)})"
-        )
-    return f
 
 
 class CentroidFinder():
