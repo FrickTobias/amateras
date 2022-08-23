@@ -13,8 +13,8 @@ from collections import OrderedDict
 from collections import defaultdict
 import math
 import inspect
+from amateras import utils
 from typing import List, Tuple
-from argparse import ArgumentTypeError
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
 
@@ -25,9 +25,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-ARG_MIN_VAL = 0
-ARG_MAX_VAL = 1
 
 
 def add_arguments(parser):
@@ -43,9 +40,11 @@ def add_arguments(parser):
                         help="Max size for cells. Default: %(default)s")
 
     # TODO: Add that some of these are between 0 and 1
-    parser.add_argument("--convexity-min", type=range_limited_float_type, default=0.875,
+    parser.add_argument("--convexity-min", type=utils.range_limited_float_type,
+                        default=0.875,
                         help="Min convexity for cells. Default: %(default)s")
-    parser.add_argument("--inertia-min", type=range_limited_float_type, default=0.6,
+    parser.add_argument("--inertia-min", type=utils.range_limited_float_type,
+                        default=0.6,
                         metavar="",
                         help="Min inertia for cells. Default: %(default)s")
 
@@ -97,20 +96,21 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     # Size filters
     logger.info("Filtering cells")
-    cell_contours_sfilt = filter_by_area(cell_contours, size_min=size_min,
-                                         size_max=size_max)
+    cell_contours_sfilt = utils.filter_by_area(
+        cell_contours, size_min=size_min, size_max=size_max
+    )
     sfilt_cells = len(cell_contours_sfilt)
     logger.info(f"{size_min} < Size < {size_max}: {sfilt_cells}")
 
     # Inertia filters
-    cell_contours_sfilt_ifilt = filter_by_inertia(
+    cell_contours_sfilt_ifilt = utils.filter_by_inertia(
         cell_contours_sfilt, threshold=inertia_min, keep_NA=True
     )
     sfilt_ifilt_cells = len(cell_contours_sfilt_ifilt)
     logger.info(f"Inertia > {inertia_min}: {sfilt_ifilt_cells}")
 
     # convexity filters
-    cell_contours_final = filter_for_convexity(
+    cell_contours_final = utils.filter_for_convexity(
         cell_contours_sfilt_ifilt, convexity_threshold=convexity_min, keep_NA=True
     )
     cfilt_cells = len(cell_contours_final)
@@ -132,7 +132,7 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     # Set up dataframe for finding proximal cells
     logger.info("Making dataframes for biggest cell detections")
-    all_cell_centroids = [cnt_centroid(c) for c in cell_contours_sfilt]
+    all_cell_centroids = [utils.cnt_centroid(c) for c in cell_contours_sfilt]
     cf = CentroidFinder(all_cell_centroids)
 
     # TODO: Tidy this mess up
@@ -140,7 +140,7 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
     di = OrderedDict()
     di["area"] = areas
     di["contour"] = cell_contours_final
-    centroids = [cnt_centroid(c) for c in cell_contours_final]
+    centroids = [utils.cnt_centroid(c) for c in cell_contours_final]
     di["centroid"] = centroids
     di["cX"] = [c[0] for c in centroids]
     di["cY"] = [c[1] for c in centroids]
@@ -278,19 +278,19 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
 
         # Filter for inertia (=elongation, 1 means height = width, where height = length
         # along principal axis)
-        inertia = cnt_inertia(center_contour)
+        inertia = utils.cnt_inertia(center_contour)
         if inertia is not None and inertia < inertia_thresh:
             filter_fails[f"inertia-over-{inertia_thresh}"] = True
 
         # Filter for convexity (How many indents something has, where 1 means it does
         # not have any)
-        convexity = cnt_convexity(center_contour)
+        convexity = utils.cnt_convexity(center_contour)
         if convexity is not None and convexity < convexity_thresh:
             filter_fails[f"convexity-under-{convexity_thresh}"] = True
 
         # Filter for circularity (A measurement of how circle-like the perimeter is of
         # the object, where a line < triangle < square < pentagon < ... < circle = 1)
-        circularity = cnt_circularity(center_contour)
+        circularity = utils.cnt_circularity(center_contour)
         if circularity is not None and circularity < circularity:
             filter_fails[f"circularity-under-{circularity}"] = True
 
@@ -492,40 +492,32 @@ def middlepoint(p1, p2):
     return middlepoint
 
 
-def filter_by_area(contours, size_min: int = 10, size_max: int = 500):
-    filtered = []
-    for cnt in contours:
-        if size_min < cv2.contourArea(cnt) < size_max:
-            filtered.append(cnt)
-    return filtered
-
-
-def filter_by_inertia(contours, threshold: float = 0.01, keep_NA: bool = False):
-    filtered = list()
-    for cnt in contours:
-        inertia = cnt_inertia(cnt)
-
-        # Very samll contours can sometimtes not be approximated as ellipses
-        if keep_NA and inertia is None:
-            filtered.append(cnt)
-            continue
-        elif inertia >= threshold:
-            filtered.append(cnt)
-    return filtered
-
-
-def filter_for_convexity(contours, convexity_threshold: float = 0.9,
-                         keep_NA: bool = False):
-    filtered = list()
-    for cnt in contours:
-        convexity = cnt_convexity(cnt)
-        if keep_NA and convexity is None:
-            filtered.append(cnt)
-            continue
-        elif convexity >= convexity_threshold:
-            filtered.append(cnt)
-
-    return filtered
+# def filter_by_inertia(contours, threshold: float = 0.01, keep_NA: bool = False):
+#    filtered = list()
+#    for cnt in contours:
+#        inertia = utils.cnt_inertia(cnt)
+#
+#        # Very samll contours can sometimtes not be approximated as ellipses
+#        if keep_NA and inertia is None:
+#            filtered.append(cnt)
+#            continue
+#        elif inertia >= threshold:
+#            filtered.append(cnt)
+#    return filtered
+#
+#
+# def filter_for_convexity(contours, convexity_threshold: float = 0.9,
+#                         keep_NA: bool = False):
+#    filtered = list()
+#    for cnt in contours:
+#        convexity = utils.cnt_convexity(cnt)
+#        if keep_NA and convexity is None:
+#            filtered.append(cnt)
+#            continue
+#        elif convexity >= convexity_threshold:
+#            filtered.append(cnt)
+#
+#    return filtered
 
 
 def add_contours_to_img(img, contours, add_centroid: bool = False,
@@ -543,7 +535,7 @@ def add_contours_to_img(img, contours, add_centroid: bool = False,
             a = cv2.contourArea(cnt)
 
             # calculate centroid
-            c = cnt_centroid(cnt)
+            c = utils.cnt_centroid(cnt)
 
             # Set color according to area
             h = 150 + a
@@ -584,21 +576,6 @@ def mkdir(path, verbose=False):
         os.mkdir(path)
 
 
-# TODO: Do this for image
-def color_histogram(grayImage, thresholdImage):
-    # PLOT HISTOGRAM OF THRESHOLDED AND GRAYSCALE IMAGES
-    plt.figure(figsize=(14, 12))
-    plt.subplot(2, 2, 1), plt.imshow(grayImage, 'gray'), plt.title('Grayscale Image')
-    plt.subplot(2, 2, 2), plt.hist(grayImage.ravel(), 256), plt.title(
-        'Color Histogram of Grayscale Image')
-    plt.subplot(2, 2, 3), plt.imshow(thresholdImage, 'gray'), plt.title(
-        'Binary (Thresholded)  Image')
-    plt.subplot(2, 2, 4), plt.hist(thresholdImage.ravel(), 256), plt.title(
-        'Color Histogram of Binary (Thresholded) Image')
-    plt.savefig('fig1.png')
-    plt.show()
-
-
 def find_short_path(coords, qc_outdir=None):
     logger.info("Finding short path in between points")
     distance_matrix = tsp_dist_matrix(coords, tsp_is_open=True)
@@ -624,19 +601,6 @@ def tsp_dist_matrix(coords, tsp_is_open: bool = False):
     if tsp_is_open:
         distance_matrix[:, 0] = 0
     return distance_matrix
-
-
-def range_limited_float_type(arg):
-    """ Type function for argparse - a float within some predefined bounds """
-    try:
-        f = float(arg)
-    except ValueError:
-        raise ArgumentTypeError("Must be a floating point number")
-    if f < ARG_MIN_VAL or f >= ARG_MAX_VAL:
-        raise ArgumentTypeError(
-            f"Argument must be within [{str(ARG_MIN_VAL)}, {str(ARG_MAX_VAL)})"
-        )
-    return f
 
 
 class CentroidFinder():

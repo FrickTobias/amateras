@@ -3,6 +3,7 @@ import sys
 import hashlib
 import pytest
 from amateras.cli.bigcellfinder import find_big_cells, find_short_path
+from amateras.cli.fluorescencefinder import find_fluorescencent_spots
 from amateras.__main__ import main as amateras_main
 
 # TODO: Test on image_slice_with_hair
@@ -63,4 +64,11 @@ def test_big_cell_finder(img=IMAGE):
 def test_picking_path(coords=XY_COORDINATES):
     _, distance = find_short_path(coords)
     assert distance < (PATH_STARTING_DIST / 2)
+    return
+
+
+def test_fluorescence_finder(img=IMAGE):
+    xy_coordinates = find_fluorescencent_spots(img, n_cells=100)
+    # TODO: Change this to something more robust
+    assert len(xy_coordinates) == 0
     return
