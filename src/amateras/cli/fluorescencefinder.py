@@ -58,7 +58,7 @@ def main(args):
         args.input, args.n_cells, args.qc_outdir
     )
     fluorescent_cells_ordered, dist = find_short_path(fluorescent_cells, args.qc_outdir)
-    print(fluorescent_cells_ordered)
+    utils.print_to_out(fluorescent_cells_ordered, header=True)
 
 
 def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
@@ -309,7 +309,7 @@ def find_white_spots(img_gray, white_thresh):
     return white_thresh
 
 
-def find_short_path(coords, qc_outdir=None):
+def find_short_path(coords):
     logger.info("Finding short path in between points")
     distance_matrix = tsp_dist_matrix(coords, tsp_is_open=True)
     logging.getLogger("python_tsp.heuristics.local_search").setLevel(logging.WARNING)
