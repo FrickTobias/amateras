@@ -57,7 +57,7 @@ def main(args):
     fluorescent_cells = find_fluorescencent_spots(
         args.input, args.n_cells, args.qc_outdir
     )
-    fluorescent_cells_ordered, dist = find_short_path(fluorescent_cells, args.qc_outdir)
+    fluorescent_cells_ordered, dist = find_short_path(fluorescent_cells)
     utils.print_to_out(fluorescent_cells_ordered, header=True)
 
 

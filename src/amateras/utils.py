@@ -5,6 +5,8 @@ import logging
 import shutil
 import os
 from pathlib import Path
+from typing import Tuple
+from typing import List
 from argparse import ArgumentTypeError
 
 logger = logging.getLogger(__name__)
@@ -149,7 +151,7 @@ def filter_for_circularity(contours, circularity_threshold: float = 0.7,
     return filtered
 
 
-def print_to_out(sorted_coordinates: list, header: bool=False):
+def print_to_out(sorted_coordinates: List[Tuple[int, int]], header: bool = False):
     if header:
         print("No,X,Y")
     for i, (x, y) in enumerate(sorted_coordinates):
