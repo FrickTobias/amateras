@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 def add_arguments(parser):
     parser.add_argument("input", help="input image")
 
-    # TODO: Make optional and maybe just write coords
     parser.add_argument("--qc-outdir", help="Output directory")
     parser.add_argument("--n-cells", type=int, default=20, help="Number of cells find.")
     parser.add_argument("--details", action="store_true", help="Writes extra files")
@@ -39,7 +38,6 @@ def add_arguments(parser):
     parser.add_argument("--size-max", type=int, default=500,
                         help="Max size for cells. Default: %(default)s")
 
-    # TODO: Add that some of these are between 0 and 1
     parser.add_argument("--convexity-min", type=utils.range_limited_float_type,
                         default=0.875,
                         help="Min convexity for cells. Default: %(default)s")
@@ -60,7 +58,7 @@ def main(args):
         args.convexity_min, args.inertia_min
     )
     big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
-    print(big_cells_ordered)
+    utils.print_to_out(big_cells_ordered, header=True)
 
 
 def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
@@ -243,7 +241,7 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
     return big_cells
 
 
-def add_distances_to_img(img, p1, p2):
+def add_distances_to_img(img, p1: Tuple[int, int], p2: Tuple[int, int]):
     middle = middlepoint(p1, p2)
     text_pos = (middle[0] + 5, middle[1])
     dist = round(math.dist(p1, p2))
@@ -256,7 +254,7 @@ def add_distances_to_img(img, p1, p2):
 
 
 def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float = 0.6,
-                       convexity_thresh: float = 0.8, circularity: float = 0.7,
+                       convexity_thresh: float = 0.8, circularity_thresh: float = 0.7,
                        cell_img=None, details: bool = False, qc_outdir=None):
     # Inits
     filter_fails = defaultdict(bool)
@@ -291,7 +289,7 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
         # Filter for circularity (A measurement of how circle-like the perimeter is of
         # the object, where a line < triangle < square < pentagon < ... < circle = 1)
         circularity = utils.cnt_circularity(center_contour)
-        if circularity is not None and circularity < circularity:
+        if circularity is not None and circularity < circularity_thresh:
             filter_fails[f"circularity-under-{circularity}"] = True
 
     # Write rejected to output
@@ -312,7 +310,7 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
     return filter_pass
 
 
-def mask_dust(img, thresh_min: int = 60, thresh_max: int = 255, min_size: int = 4000,
+def mask_dust(img, thresh_min: int = 60, min_size: int = 4000,
               blurring_kernel: int = 11, erosion_kernel_number: int = 5,
               erosion_iterations: int = 3, details: bool = False, qc_outdir=None):
     # Convert to gray for analysis
@@ -490,34 +488,6 @@ def middlepoint(p1, p2):
         middle = int((max(line) - min(line)) / 2) + min(line)
         middlepoint.append(middle)
     return middlepoint
-
-
-# def filter_by_inertia(contours, threshold: float = 0.01, keep_NA: bool = False):
-#    filtered = list()
-#    for cnt in contours:
-#        inertia = utils.cnt_inertia(cnt)
-#
-#        # Very samll contours can sometimtes not be approximated as ellipses
-#        if keep_NA and inertia is None:
-#            filtered.append(cnt)
-#            continue
-#        elif inertia >= threshold:
-#            filtered.append(cnt)
-#    return filtered
-#
-#
-# def filter_for_convexity(contours, convexity_threshold: float = 0.9,
-#                         keep_NA: bool = False):
-#    filtered = list()
-#    for cnt in contours:
-#        convexity = utils.cnt_convexity(cnt)
-#        if keep_NA and convexity is None:
-#            filtered.append(cnt)
-#            continue
-#        elif convexity >= convexity_threshold:
-#            filtered.append(cnt)
-#
-#    return filtered
 
 
 def add_contours_to_img(img, contours, add_centroid: bool = False,

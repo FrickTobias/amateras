@@ -4,6 +4,9 @@ import numpy as np
 import logging
 import shutil
 import os
+from pathlib import Path
+from typing import Tuple
+from typing import List
 from argparse import ArgumentTypeError
 
 logger = logging.getLogger(__name__)
@@ -12,7 +15,6 @@ ARG_MIN_VAL = 0
 ARG_MAX_VAL = 1
 
 
-# TODO: Do this for image
 def color_histogram(grayImage, thresholdImage):
     # PLOT HISTOGRAM OF THRESHOLDED AND GRAYSCALE IMAGES
     plt.figure(figsize=(14, 12))
@@ -40,16 +42,20 @@ def range_limited_float_type(arg):
     return f
 
 
-def mkdir(path, verbose=False):
+def mkdir(path: Path, verbose: bool = False, overwrite: bool = False):
     if not os.path.isdir(path):
         if verbose:
             logger.info(f"creating {path}")
         os.mkdir(path)
     else:
-        if verbose:
-            logger.info(f"recreating {path}")
-        shutil.rmtree(path)
-        os.mkdir(path)
+        if overwrite:
+            if verbose:
+                logger.info(f"recreating {path}")
+            shutil.rmtree(path)
+            os.mkdir(path)
+        else:
+            if verbose:
+                logger.info(f"{path} already exist")
 
 
 def cnt_convexity(cnt):
@@ -143,3 +149,10 @@ def filter_for_circularity(contours, circularity_threshold: float = 0.7,
             filtered.append(cnt)
 
     return filtered
+
+
+def print_to_out(sorted_coordinates: List[Tuple[int, int]], header: bool = False):
+    if header:
+        print("No,X,Y")
+    for i, (x, y) in enumerate(sorted_coordinates):
+        print(f"{i},{x},{y}")
