@@ -57,8 +57,10 @@ def main(args):
         args.size_max,
         args.convexity_min, args.inertia_min
     )
-    big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
-    utils.print_to_out(big_cells_ordered, header=True)
+    utils.print_to_out(big_cells, header=True)
+
+    # big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
+    # utils.print_to_out(big_cells_ordered, header=True)
 
 
 def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
@@ -171,8 +173,10 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
         if qc_outdir and details:
             out_cnt = cell_raw.copy()
             out_cnt = cv2.drawContours(out_cnt, center_contours, -1, (50, 255, 50), -1)
-            cv2.imwrite(f"{qc_outdir}/center-contours/candidate-{i}-raw.tif", cell_raw)
-            cv2.imwrite(f"{qc_outdir}/center-contours/candidate-{i}-cnt.tif", out_cnt)
+            cv2.imwrite(f"{qc_outdir}/center-contours/candidate-{i + 1}-raw.tif",
+                        cell_raw)
+            cv2.imwrite(f"{qc_outdir}/center-contours/candidate-{i + 1}-cnt.tif",
+                        out_cnt)
 
         if filter_pass:
             # Find and mark proximal cells in output
@@ -185,11 +189,11 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
             # Mark big cell in output
             big_cells.append(centroid)
-            out = cv2.putText(out, f"big cell: {good_cells}", (sX1, sY1 - 5),
+            out = cv2.putText(out, f"big cell: {good_cells + 1}", (sX1, sY1 - 5),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
             out = cv2.rectangle(out, (sX1, sY1), (sX2, sY2), (50, 50, 255), 5)
             out_big_cells = cv2.putText(
-                out_big_cells, f"big cell: {good_cells}", (sX1, sY1 - 5),
+                out_big_cells, f"big cell: {good_cells + 1}", (sX1, sY1 - 5),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1
             )
             out_big_cells = cv2.rectangle(out_big_cells, (sX1, sY1), (sX2, sY2),
@@ -216,23 +220,23 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
         cv2.imwrite(f"{qc_outdir}/detections-and-{n_cells}-biggest-cells.tif", out)
         cv2.imwrite(f"{qc_outdir}/{n_cells}-biggest-cells.tif", out_big_cells)
 
-        logger.info("Finding picking path (only for example image)")
-        ordered_big_cells, _ = find_short_path(big_cells)
-        out_picking_path = out.copy()
-        for point1, point2 in zip(ordered_big_cells, ordered_big_cells[1:]):
-            out_picking_path = cv2.line(
-                out_picking_path, point1, point2, [125, 255, 50], 2
-            )
-        tX, tY = ordered_big_cells[0]
-        tX -= 20
-        tY -= 60
-        out_picking_path = cv2.putText(
-            out_picking_path, "start", (tX, tY), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-            (125, 255, 50), 2
-        )
-
-        cv2.imwrite(f"{qc_outdir}/{function_name}.picking-path-example.tif",
-                    out_picking_path)
+        # logger.info("Finding picking path (only for example image)")
+        # ordered_big_cells, _ = find_short_path(big_cells)
+        # out_picking_path = out.copy()
+        # for point1, point2 in zip(ordered_big_cells, ordered_big_cells[1:]):
+        #    out_picking_path = cv2.line(
+        #        out_picking_path, point1, point2, [125, 255, 50], 2
+        #    )
+        # tX, tY = ordered_big_cells[0]
+        # tX -= 20
+        # tY -= 60
+        # out_picking_path = cv2.putText(
+        #    out_picking_path, "start", (tX, tY), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+        #    (125, 255, 50), 2
+        # )
+        #
+        # cv2.imwrite(f"{qc_outdir}/{function_name}.picking-path-example.tif",
+        #            out_picking_path)
 
         if details:
             logger.info("Writing QC outputs")
@@ -297,7 +301,8 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
         reasons = [reason for reason, filter_fail in filter_fails.items() if
                    filter_fail is True]
         cv2.imwrite(
-            f"{qc_outdir}/rejections/candidate-{candidate_no}.{'.'.join(reasons)}.tif",
+            f"{qc_outdir}/rejections/candidate-{candidate_no + 1}.{'.'.join(reasons)}"
+            f".tif",
             cell_img
         )
 

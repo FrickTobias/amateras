@@ -57,8 +57,10 @@ def main(args):
     fluorescent_cells = find_fluorescencent_spots(
         args.input, args.n_cells, args.qc_outdir
     )
-    fluorescent_cells_ordered, dist = find_short_path(fluorescent_cells)
-    utils.print_to_out(fluorescent_cells_ordered, header=True)
+    utils.print_to_out(fluorescent_cells, header=True)
+
+    # fluorescent_cells_ordered, dist = find_short_path(fluorescent_cells)
+    # utils.print_to_out(fluorescent_cells_ordered, header=True)
 
 
 def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
@@ -149,16 +151,22 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
         bbox = cv2.boundingRect(cnt)
         x, y, w, h = bbox
         cv2.rectangle(img_mod, (x, y), (x + w, y + h), (50, 50, 255), 1)
-        cv2.putText(img_mod, f"{i}: {round(intensity, 2)}", (x, y - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
+        # cv2.putText(img_mod, f"{i}: {round(intensity, 2)}", (x, y - 5),
+        #            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
         centroids.append(utils.cnt_centroid(cnt))
 
         # Marking high intensity cells
-        cv2.putText(
-            img_mod, f"high int: {i}", (x + w // 2, y + h // 2 - 5),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.4, (50, 50, 255), 1
-        )
+        cv2.putText(img_mod, f"high int cell: {i + 1}", (x - 30, y - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
+
+        cv2.putText(img_mod, f"intensity: {round(intensity, 2)}", (x - 30, y - 35),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
+
+        # cv2.putText(
+        #    img_mod, f"high int: {i}", (x + w // 2, y + h // 2 - 5),
+        #    cv2.FONT_HERSHEY_SIMPLEX,
+        #    0.4, (50, 50, 255), 1
+        # )
         img_mod = cv2.rectangle(
             img_mod, (x + w // 2 - 40, y + h // 2 - 40),
             (x + w // 2 + 40, y + h // 2 + 40), (50, 50, 255), 5
@@ -170,7 +178,7 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
         cv2.imwrite(f"{qc_outdir}/input.tif", img)
         cv2.imwrite(f"{qc_outdir}/blur.tif", blur)
         cv2.imwrite(f"{qc_outdir}/thresh.tif", white_thresh)
-        cv2.imwrite(f"{qc_outdir}/cnts.tif", img_mod)
+        cv2.imwrite(f"{qc_outdir}/{n_cells}-highest-intesity-cells.tif", img_mod)
         xmax = int(np.average(intensities) * 2)
         plt.hist(intensities, range(xmax))
         plt.title("intensities")
@@ -178,22 +186,22 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
         plt.xlabel("intensity [lx/px]")
         plt.savefig(f"{qc_outdir}/intesities-historam.png")
 
-        logger.info("Finding picking path (only for example image)")
-        ordered_centroids, _ = find_short_path(centroids)
-        img_path = img_mod.copy()
-        for point1, point2 in zip(ordered_centroids, ordered_centroids[1:]):
-            img_path = cv2.line(
-                img_path, point1, point2, [125, 255, 50], 2
-            )
-        tX, tY = ordered_centroids[0]
-        tX -= 20
-        tY -= 60
-        img_path = cv2.putText(
-            img_path, "start", (tX, tY), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-            (125, 255, 50), 2
-        )
-
-        cv2.imwrite(f"{qc_outdir}/picking-path-example.tif", img_path)
+        # logger.info("Finding picking path (only for example image)")
+        # ordered_centroids, _ = find_short_path(centroids)
+        # img_path = img_mod.copy()
+        # for point1, point2 in zip(ordered_centroids, ordered_centroids[1:]):
+        #    img_path = cv2.line(
+        #        img_path, point1, point2, [125, 255, 50], 2
+        #    )
+        # tX, tY = ordered_centroids[0]
+        # tX -= 20
+        # tY -= 60
+        # img_path = cv2.putText(
+        #    img_path, "start", (tX, tY), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+        #    (125, 255, 50), 2
+        # )
+        #
+        # cv2.imwrite(f"{qc_outdir}/picking-path-example.tif", img_path)
 
     return centroids
 
