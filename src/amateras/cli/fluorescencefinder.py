@@ -5,14 +5,14 @@ Finds big cells and calculates shortest path in between them
 import logging
 import cv2
 import numpy as np
-import os
-import shutil
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from typing import Tuple
 from amateras import utils
+from pathlib import Path
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,7 +29,7 @@ ARG_MAX_VAL = 1
 def add_arguments(parser):
     parser.add_argument("input", help="input image")
     parser.add_argument("--n-cells", type=int, default=20, help="Number of cells find.")
-    parser.add_argument("--qc-outdir", help="Output directory")
+    parser.add_argument("--qc-outdir", type=Path, help="Output directory")
 
     # TODO: Make optional and maybe just write coords
     parser.add_argument("--details", action="store_true", help="Writes extra files")
@@ -174,7 +174,7 @@ def find_fluorescencent_spots(input, n_cells, qc_outdir=None):
 
     logger.info("Writing output")
     if qc_outdir:
-        mkdir(qc_outdir)
+        utils.mkdir(qc_outdir)
         cv2.imwrite(f"{qc_outdir}/input.tif", img)
         cv2.imwrite(f"{qc_outdir}/blur.tif", blur)
         cv2.imwrite(f"{qc_outdir}/thresh.tif", white_thresh)
@@ -222,16 +222,16 @@ def cnt_mask_img(img, cnt, cnt_start: Tuple[int, int] = (0, 0)):
     return img_masked
 
 
-def mkdir(path, verbose=False):
-    if not os.path.isdir(path):
-        if verbose:
-            logger.info(f"creating {path}")
-        os.mkdir(path)
-    else:
-        if verbose:
-            logger.info(f"recreating {path}")
-        shutil.rmtree(path)
-        os.mkdir(path)
+# def mkdir(path, verbose=False):
+#    if not os.path.isdir(path):
+#        if verbose:
+#            logger.info(f"creating {path}")
+#        os.mkdir(path)
+#    else:
+#        if verbose:
+#            logger.info(f"recreating {path}")
+#        shutil.rmtree(path)
+#        os.mkdir(path)
 
 
 def cell_center_detector(roi, contour, cnt_start: Tuple[int, int] = (0, 0)):
