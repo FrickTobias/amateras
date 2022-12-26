@@ -5,10 +5,9 @@ Finds big cells and calculates shortest path in between them
 import logging
 import cv2
 import numpy as np
-import os
-import shutil
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
 from collections import OrderedDict
 from collections import defaultdict
 import math
@@ -17,6 +16,7 @@ from amateras import utils
 from typing import List, Tuple
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def add_arguments(parser):
     parser.add_argument("input", help="input image")
 
-    parser.add_argument("--qc-outdir", help="Output directory")
+    parser.add_argument("--qc-outdir", type=Path, help="Output directory")
     parser.add_argument("--n-cells", type=int, default=20, help="Number of cells find.")
     parser.add_argument("--details", action="store_true", help="Writes extra files")
     parser.add_argument("--size-min", type=int, default=30,
@@ -71,11 +71,11 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     if qc_outdir:
         logger.info("Setting up")
-        mkdir(qc_outdir)
+        utils.mkdir(qc_outdir)
         function_name = inspect.stack()[0][3]
         if details:
-            mkdir(f"{qc_outdir}/rejections")
-            mkdir(f"{qc_outdir}/center-contours")
+            utils.mkdir(qc_outdir.joinpath("rejections"))
+            utils.mkdir(qc_outdir.joinpath("center-contours"))
 
     # Add to img
     out = input_img.copy()
@@ -539,16 +539,16 @@ def save_histogram(data: List[int], file_name: str, bins: range, title=None,
     plt.close()
 
 
-def mkdir(path, verbose=False):
-    if not os.path.isdir(path):
-        if verbose:
-            logger.info(f"creating {path}")
-        os.mkdir(path)
-    else:
-        if verbose:
-            logger.info(f"recreating {path}")
-        shutil.rmtree(path)
-        os.mkdir(path)
+# def mkdir(path, verbose=False):
+#    if not os.path.isdir(path):
+#        if verbose:
+#            logger.info(f"creating {path}")
+#        os.mkdir(path)
+#    else:
+#        if verbose:
+#            logger.info(f"recreating {path}")
+#        shutil.rmtree(path)
+#        os.mkdir(path)
 
 
 def find_short_path(coords, qc_outdir=None):
