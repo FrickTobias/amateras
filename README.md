@@ -10,6 +10,11 @@ Image analysis for AMATERAS microscope
     cd amateras
     pip install -e .
 
+## Update
+
+    cd amateras
+    git pull
+
 ## Usage
 
     amateras bigcellfinder -h
