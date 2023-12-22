@@ -25,7 +25,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-AUTO_THRESH_LOW = 0.2
+AUTO_THRESH_LOW = 2.0
 AUTO_THRESH_HIGH = 99.95
 
 
