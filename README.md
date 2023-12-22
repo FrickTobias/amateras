@@ -23,13 +23,13 @@ Image analysis for AMATERAS microscope
 
 Minimal
 
-    amateras bigcellfinder tests/img.tif --n-cells 100 > ~/Desktop/positions.txt
+    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 > ~/Desktop/positions.txt
 
 Write qc output
 
-    amateras bigcellfinder tests/img.tif --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output > ~/Desktop/positions.txt
+    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output > ~/Desktop/positions.txt
 
 Include details of all steps in analysis
 
-    amateras bigcellfinder tests/img.tif --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output --details > ~/Desktop/positions.txt
+    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output --details > ~/Desktop/positions.txt
 
