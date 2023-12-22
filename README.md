@@ -23,13 +23,28 @@ Image analysis for AMATERAS microscope
 
 Minimal
 
-    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 > ~/Desktop/positions.txt
+    amateras bigcellfinder tests/img.tif --n-cells 100 > ~/Desktop/positions.txt
 
 Write qc output
 
-    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output > ~/Desktop/positions.txt
+    amateras bigcellfinder tests/img.tif --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output > ~/Desktop/positions.txt
 
 Include details of all steps in analysis
 
-    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output --details > ~/Desktop/positions.txt
+    amateras bigcellfinder tests/img.tif --n-cells 100 --qc-outdir ~/Desktop/bigcells-qc-output --details > ~/Desktop/positions.txt
+
+## Advanced examples 
+Try modifying program settings if cells are missing or being falsely identified
+
+Use automatic thresholding
+
+    amateras bigcellfinder tests/img.tif --auto-thresh --n-cells 100 > ~/Desktop/positions.txt
+
+Set thresholding manually (corresponds to highest px value for black area of cell lowest px value for white area of cell)
+
+    amateras bigcellfinder tests/img.tif --black-thresh 90 --white-thresh 150 --n-cells 100 > ~/Desktop/positions.txt
+
+Filter out high density regions
+
+    amateras bigcellfinder tests/img.tif --final-filter --n-cells 100 > ~/Desktop/positions.txt
 
