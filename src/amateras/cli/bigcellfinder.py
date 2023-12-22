@@ -17,7 +17,6 @@ from typing import List, Tuple
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(filename)s %(levelname)s %(asctime)s:\t%(message)s",
@@ -26,6 +25,9 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+AUTO_THRESH_LOW = 0.2
+AUTO_THRESH_HIGH = 99.95
+
 
 def add_arguments(parser):
     parser.add_argument("input", help="input image")
@@ -33,18 +35,40 @@ def add_arguments(parser):
     parser.add_argument("--qc-outdir", type=Path, help="Output directory")
     parser.add_argument("--n-cells", type=int, default=20, help="Number of cells find.")
     parser.add_argument("--details", action="store_true", help="Writes extra files")
-    parser.add_argument("--size-min", type=int, default=30,
-                        help="Min size for cells. Default: %(default)s")
-    parser.add_argument("--size-max", type=int, default=500,
-                        help="Max size for cells. Default: %(default)s")
-
-    parser.add_argument("--convexity-min", type=utils.range_limited_float_type,
-                        default=0.875,
-                        help="Min convexity for cells. Default: %(default)s")
-    parser.add_argument("--inertia-min", type=utils.range_limited_float_type,
-                        default=0.6,
-                        metavar="",
-                        help="Min inertia for cells. Default: %(default)s")
+    parser.add_argument(
+        "--size-min", type=int, default=30,
+        help="Min size for cells. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--size-max", type=int, default=500,
+        help="Max size for cells. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--convexity-min", type=utils.range_limited_float_type, default=0.875,
+        help="Min convexity for cells. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--inertia-min", type=utils.range_limited_float_type, default=0.6, metavar="",
+        help="Min inertia for cells. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--black-thresh", type=int, default=70,
+        help="Max px value for black part of cells. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--white-thresh", type=int, default=125,
+        help="Min px value for white part of cells. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--auto-thresh", action="store_true",
+        help=f"Set --black-thresh and --white-thresh automatically using px percentile "
+             f"values (lower limits = {AUTO_THRESH_LOW}, "
+             f"upper limits = {AUTO_THRESH_HIGH})"
+    )
+    parser.add_argument(
+        "--final-filter", action="store_true",
+        help="Adds a last final filter for candidate cells"
+    )
 
     # TODO: Add arguments for final filtering
     # TODO: Add argument for logfile writing
@@ -54,8 +78,9 @@ def add_arguments(parser):
 def main(args):
     big_cells = find_big_cells(
         args.input, args.n_cells, args.qc_outdir, args.details, args.size_min,
-        args.size_max,
-        args.convexity_min, args.inertia_min
+        args.size_max, args.convexity_min, inertia_min=args.inertia_min,
+        black_thresh=args.black_thresh, white_thresh=args.white_thresh,
+        final_filter=args.final_filter, auto_thresh=args.auto_thresh
     )
     utils.print_to_out(big_cells, header=True)
 
@@ -65,7 +90,9 @@ def main(args):
 
 def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
                    size_min: int = 30, size_max: int = 500,
-                   convexity_min: float = 0.875, inertia_min: float = 0.6):
+                   convexity_min: float = 0.875, inertia_min: float = 0.6,
+                   black_thresh: int = 70, white_thresh: int = 125,
+                   final_filter: bool = False, auto_thresh: bool = False):
     logger.info("Opening file")
     input_img = cv2.imread(input)
 
@@ -88,7 +115,9 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     # Detect cells
     logger.info("Detecting cells")
-    cell_contours = cell_detector_2(out, details=details, qc_outdir=qc_outdir)
+    cell_contours = cell_detector_2(out, details=details, qc_outdir=qc_outdir,
+                                    black_thresh=black_thresh,
+                                    white_thresh=white_thresh, auto_thresh=auto_thresh)
 
     # Write to terminal
     detected_cells = len(cell_contours)
@@ -165,10 +194,13 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
         center_contours = cell_center_detector(cell_raw, cnt, cnt_start=(x, y))
 
         # Filter one last time
-        filter_pass = final_qc_filtering(
-            center_contours, candidate_no=i, cell_img=cell_raw, details=details,
-            qc_outdir=qc_outdir
-        )
+        if final_filter:
+            filter_pass = final_qc_filtering(
+                center_contours, candidate_no=i, cell_img=cell_raw, details=details,
+                qc_outdir=qc_outdir
+            )
+        else:
+            filter_pass = True
 
         if qc_outdir and details:
             out_cnt = cell_raw.copy()
@@ -361,7 +393,17 @@ def mask_dust(img, thresh_min: int = 60, min_size: int = 4000,
 
 
 def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: int = 70,
-                    white_thresh: int = 125, details: bool = False, qc_outdir=None):
+                    white_thresh: int = 125, details: bool = False, qc_outdir=None,
+                    auto_thresh: bool = False):
+    # Calculate black/white threshold values from image based on px percentiles
+    if auto_thresh:
+        logger.info("Estimating suitable --black-tresh and --white-tresh automatically")
+        px_values = img.flatten()
+        black_thresh = round(np.percentile(px_values, AUTO_THRESH_LOW))
+        white_thresh = round(np.percentile(px_values, AUTO_THRESH_HIGH))
+        logger.info(f"Using --black-thresh: {black_thresh}")
+        logger.info(f"Using --white-thresh: {white_thresh}")
+
     # Find black spots
     blurred = cv2.blur(img, blur_kernel)
     blurred_gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
@@ -527,7 +569,7 @@ def add_contours_to_img(img, contours, add_centroid: bool = False,
     return out
 
 
-def save_histogram(data: List[int], file_name: str, bins: range, title=None,
+def save_histogram(data: List[float], file_name: str, bins: range, title=None,
                    x_axis=None, x_unit=None, y_axis=None, y_unit=None):
     ar = np.array(data)
     fig, ax = plt.subplots(figsize=(10, 7))
