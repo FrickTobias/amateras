@@ -69,6 +69,10 @@ def add_arguments(parser):
         "--final-filter", action="store_true",
         help="Adds a last final filter for candidate cells"
     )
+    parser.add_argument(
+        "--include-area", action="store_true",
+        help="Includes area in final output printing"
+    )
 
     # TODO: Add arguments for final filtering
     # TODO: Add argument for logfile writing
@@ -76,13 +80,16 @@ def add_arguments(parser):
 
 
 def main(args):
-    big_cells = find_big_cells(
+    big_cells, areas = find_big_cells(
         args.input, args.n_cells, args.qc_outdir, args.details, args.size_min,
         args.size_max, args.convexity_min, inertia_min=args.inertia_min,
         black_thresh=args.black_thresh, white_thresh=args.white_thresh,
         final_filter=args.final_filter, auto_thresh=args.auto_thresh
     )
-    utils.print_to_out(big_cells, header=True)
+    if args.include_area:
+        utils.print_to_out(big_cells, header=True, arealist=areas)
+    else:
+        utils.print_to_out(big_cells, header=True)
 
     # big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
     # utils.print_to_out(big_cells_ordered, header=True)
@@ -185,6 +192,7 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
     logger.info(f"Locating the {n_cells} biggest cells")
     good_cells = 0
     big_cells = list()
+    big_cells_areas = list()
     for i, (centroid, area, cnt) in enumerate(zip(dfsort_c, dfsort_a, dfsort_cont)):
         bbox = cv2.boundingRect(cnt)
         x, y, w, h = bbox
@@ -221,6 +229,8 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
             # Mark big cell in output
             big_cells.append(centroid)
+            big_cells_areas.append(area)
+
             out = cv2.putText(out, f"big cell: {good_cells + 1}", (sX1, sY1 - 5),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 255), 1)
             out = cv2.rectangle(out, (sX1, sY1), (sX2, sY2), (50, 50, 255), 5)
@@ -274,7 +284,7 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
             logger.info("Writing QC outputs")
             cv2.imwrite(f"{qc_outdir}/{function_name}.input.tif", input_img)
 
-    return big_cells
+    return big_cells, big_cells_areas
 
 
 def add_distances_to_img(img, p1: Tuple[int, int], p2: Tuple[int, int]):
