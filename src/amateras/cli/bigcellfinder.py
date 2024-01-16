@@ -13,7 +13,7 @@ from collections import defaultdict
 import math
 import inspect
 from amateras import utils
-from typing import List, Tuple
+from typing import List, Tuple, Any, Sequence
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
 
@@ -95,7 +95,7 @@ def main(args):
     # utils.print_to_out(big_cells_ordered, header=True)
 
 
-def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
+def find_big_cells(input: str, n_cells: int, qc_outdir=None, details: bool = False,
                    size_min: int = 30, size_max: int = 500,
                    convexity_min: float = 0.875, inertia_min: float = 0.6,
                    black_thresh: int = 70, white_thresh: int = 125,
@@ -117,7 +117,7 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
 
     # Remove huge objects
     logger.info("Masking dust")
-    out = mask_dust(out, thresh_min=60, min_size=4000, details=details,
+    out = mask_dust(out.astype(np.uint8), thresh_min=60, min_size=4000, details=details,
                     qc_outdir=qc_outdir)
 
     # Detect cells
@@ -287,7 +287,9 @@ def find_big_cells(input, n_cells: int, qc_outdir=None, details: bool = False,
     return big_cells, big_cells_areas
 
 
-def add_distances_to_img(img, p1: Tuple[int, int], p2: Tuple[int, int]):
+def add_distances_to_img(img: np.ndarray[Any, np.dtype[np.generic]],
+                         p1: Tuple[int, int],
+                         p2: Tuple[int, int]):
     middle = middlepoint(p1, p2)
     text_pos = (middle[0] + 5, middle[1])
     dist = round(math.dist(p1, p2))
@@ -299,7 +301,9 @@ def add_distances_to_img(img, p1: Tuple[int, int], p2: Tuple[int, int]):
     return img
 
 
-def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float = 0.6,
+def final_qc_filtering(center_contours: List[np.ndarray[Any, np.dtype[np.generic]]],
+                       candidate_no: int,
+                       inertia_thresh: float = 0.6,
                        convexity_thresh: float = 0.8, circularity_thresh: float = 0.7,
                        cell_img=None, details: bool = False, qc_outdir=None):
     # Inits
@@ -357,7 +361,8 @@ def final_qc_filtering(center_contours, candidate_no: int, inertia_thresh: float
     return filter_pass
 
 
-def mask_dust(img, thresh_min: int = 60, min_size: int = 4000,
+def mask_dust(img: np.ndarray[Any, np.dtype[np.uint8]], thresh_min: int = 60,
+              min_size: int = 4000,
               blurring_kernel: int = 11, erosion_kernel_number: int = 5,
               erosion_iterations: int = 3, details: bool = False, qc_outdir=None):
     # Convert to gray for analysis
@@ -369,12 +374,12 @@ def mask_dust(img, thresh_min: int = 60, min_size: int = 4000,
     # Creating morphological erosion mask
     lower = thresh_min
     upper = 255
-    inrange = cv2.inRange(blurred_median, lower, upper)
+    inrange = cv2.inRange(blurred_median, lower, upper)  # type: ignore
     erosion_kernel = np.ones((erosion_kernel_number, erosion_kernel_number), np.uint8)
     erosion = cv2.erode(inrange, erosion_kernel, iterations=erosion_iterations)
 
     # remove small objects in threshed
-    contours, _ = cv2.findContours((255 - erosion), cv2.RETR_TREE,
+    contours, _ = cv2.findContours((np.array(255) - erosion), cv2.RETR_TREE,
                                    cv2.CHAIN_APPROX_SIMPLE)
     bigcnts = []
     for cnt in contours:
@@ -382,8 +387,8 @@ def mask_dust(img, thresh_min: int = 60, min_size: int = 4000,
             bigcnts.append(cnt)
 
     # Prep mask
-    mask = np.zeros(img.shape, dtype=np.uint8)
-    mask = cv2.drawContours(mask, bigcnts, -1, (255, 255, 255), -1)
+    mask = np.zeros_like(img, dtype=np.uint8)
+    mask = cv2.drawContours(mask, bigcnts, -1, (255, 255, 255), -1)  # type: ignore
     mask_inv = 255 - mask
 
     # Mask image
@@ -402,13 +407,15 @@ def mask_dust(img, thresh_min: int = 60, min_size: int = 4000,
     return masked
 
 
-def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: int = 70,
+def cell_detector_2(img: np.ndarray[Any, np.dtype[np.generic]],
+                    blur_kernel: Tuple[int, int] = (3, 3),
+                    black_thresh: int = 70,
                     white_thresh: int = 125, details: bool = False, qc_outdir=None,
                     auto_thresh: bool = False):
     # Calculate black/white threshold values from image based on px percentiles
     if auto_thresh:
         logger.info("Estimating suitable --black-tresh and --white-tresh automatically")
-        px_values = img.flatten()
+        px_values = img.astype(np.uint8).flatten()
         black_thresh = round(np.percentile(px_values, AUTO_THRESH_LOW))
         white_thresh = round(np.percentile(px_values, AUTO_THRESH_HIGH))
         logger.info(f"Using --black-thresh: {black_thresh}")
@@ -417,17 +424,21 @@ def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: in
     # Find black spots
     blurred = cv2.blur(img, blur_kernel)
     blurred_gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
-    _, black_thresh = cv2.threshold(blurred_gray, black_thresh, 255, cv2.THRESH_BINARY)
-    black_thresh_inv = 255 - black_thresh
+    _, black_threshed = cv2.threshold(
+        blurred_gray, black_thresh, 255, cv2.THRESH_BINARY
+    )  # type: ignore
+    black_thresh_inv = np.array(255) - black_threshed
 
     # find white spots
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, white_thresh = cv2.threshold(img_gray, white_thresh, 255, cv2.THRESH_BINARY)
+    _, white_threshed = cv2.threshold(
+        img_gray, white_thresh, 255, cv2.THRESH_BINARY
+    )  # type: ignore
 
     # combine white + black
-    combined = cv2.bitwise_or(black_thresh_inv, white_thresh)
+    combined = cv2.bitwise_or(black_thresh_inv, white_threshed)  # type: ignore
 
-    # Get contours of masked imagee
+    # Get contours of masked image
     contours, _ = cv2.findContours(combined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if qc_outdir and details:
@@ -436,7 +447,7 @@ def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: in
         cv2.imwrite(f"{qc_outdir}/{function_name}.1-input.tif", img)
         cv2.imwrite(f"{qc_outdir}/{function_name}.2-blurred.tif", blurred)
         cv2.imwrite(f"{qc_outdir}/{function_name}.3-black-thresh.tif", black_thresh_inv)
-        cv2.imwrite(f"{qc_outdir}/{function_name}.4-white-thresh.tif", white_thresh)
+        cv2.imwrite(f"{qc_outdir}/{function_name}.4-white-thresh.tif", white_threshed)
         cv2.imwrite(f"{qc_outdir}/{function_name}.5-combined-thresh.tif", combined)
 
         img_show = img.copy()
@@ -446,14 +457,15 @@ def cell_detector_2(img, blur_kernel: Tuple[int, int] = (3, 3), black_thresh: in
     return contours
 
 
-def cell_center_detector(roi, contour, cnt_start: Tuple[int, int] = (0, 0)):
+def cell_center_detector(roi: np.ndarray[Any, np.dtype[np.generic]],
+                         contour: np.ndarray[Any, np.dtype[np.generic]],
+                         cnt_start: Tuple[int, int] = (0, 0)):
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
     # Make mask from contour (otherwise cnt detection will find areas outside cell)
-    contour = contour - cnt_start
-    contour = [contour]
-    mask = np.zeros(shape=gray.shape, dtype=np.uint8)
-    mask = cv2.drawContours(mask, contour, -1, 255, -1)
+    contour = contour - np.array(cnt_start)
+    mask = np.zeros_like(gray, dtype=np.uint8)
+    mask = cv2.drawContours(mask, [contour], -1, 255, -1)  # type: ignore
 
     # Run dynamic thresholding on image to find cell centers (white spots)
     thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -469,7 +481,7 @@ def cell_center_detector(roi, contour, cnt_start: Tuple[int, int] = (0, 0)):
     return contours
 
 
-def cnt_convexity(cnt):
+def cnt_convexity(cnt: np.ndarray[Any, np.dtype[np.generic]]):
     hull = cv2.convexHull(cnt)
 
     cnt_area = cv2.contourArea(cnt)
@@ -482,7 +494,7 @@ def cnt_convexity(cnt):
     return convexity
 
 
-def cnt_inertia(cnt):
+def cnt_inertia(cnt: np.ndarray[Any, np.dtype[np.generic]]):
     # Cannot approximate as ellipse if less than 5 points
     if len(cnt) < 5:
         return None
@@ -495,7 +507,7 @@ def cnt_inertia(cnt):
     return inertia
 
 
-def cnt_circularity(cnt):
+def cnt_circularity(cnt: np.ndarray[Any, np.dtype[np.generic]]):
     area = cv2.contourArea(cnt)
     perimeter = cv2.arcLength(cnt, True)
 
@@ -506,7 +518,7 @@ def cnt_circularity(cnt):
     return circularity
 
 
-def cnt_centroid(cnt):
+def cnt_centroid(cnt: np.ndarray[Any, np.dtype[np.float64]]):
     M = cv2.moments(cnt)
     cX = int(M["m10"] / M["m00"])
     cY = int(M["m01"] / M["m00"])
@@ -514,7 +526,7 @@ def cnt_centroid(cnt):
     return c
 
 
-def cnt_principal_axis(contours):
+def cnt_principal_axis(contours: List[np.ndarray[Any, np.dtype[np.float64]]]):
     principals = list()
     for cnt in contours:
         if len(cnt) < 5:
@@ -527,7 +539,8 @@ def cnt_principal_axis(contours):
     return principals
 
 
-def ellipse_principal_axis(centroid, ellipse):
+def ellipse_principal_axis(centroid: Tuple[int, int],
+                           ellipse: Tuple[Sequence[float], Sequence[int], float]):
     e = ellipse
     cx, cy = centroid
     x1 = int(np.round(cx + e[1][1] / 2 * np.cos((e[2] + 90) * np.pi / 180.0)))
@@ -538,7 +551,8 @@ def ellipse_principal_axis(centroid, ellipse):
     return pa
 
 
-def middlepoint(p1, p2):
+def middlepoint(p1: Tuple[int, int],
+                p2: Tuple[int, int]):
     middlepoint = []
     for i in range(len(p1)):
         line = [p1[i], p2[i]]
@@ -547,7 +561,9 @@ def middlepoint(p1, p2):
     return middlepoint
 
 
-def add_contours_to_img(img, contours, add_centroid: bool = False,
+def add_contours_to_img(img: np.ndarray[Any, np.dtype[np.generic]],
+                        contours: List[np.ndarray[Any, np.dtype[np.generic]]],
+                        add_centroid: bool = False,
                         add_area: bool = False,
                         color: Tuple[int, int, int] = (255, 255, 255)):
     # Draw contours
@@ -603,7 +619,7 @@ def save_histogram(data: List[float], file_name: str, bins: range, title=None,
 #        os.mkdir(path)
 
 
-def find_short_path(coords, qc_outdir=None):
+def find_short_path(coords: np.ndarray[Any, np.dtype[np.float32]], qc_outdir=None):
     logger.info("Finding short path in between points")
     distance_matrix = tsp_dist_matrix(coords, tsp_is_open=True)
     logging.getLogger("python_tsp.heuristics.local_search").setLevel(logging.WARNING)
@@ -623,7 +639,8 @@ def find_short_path(coords, qc_outdir=None):
     return ordered_coords, distance
 
 
-def tsp_dist_matrix(coords, tsp_is_open: bool = False):
+def tsp_dist_matrix(coords: np.ndarray[Any, np.dtype[np.float32]],
+                    tsp_is_open: bool = False):
     distance_matrix = euclidean_distance_matrix(coords)
     if tsp_is_open:
         distance_matrix[:, 0] = 0

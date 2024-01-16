@@ -7,12 +7,11 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from typing import Tuple
+from typing import Tuple, Any
 from amateras import utils
 from pathlib import Path
 from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.distances import euclidean_distance_matrix
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -215,7 +214,7 @@ def cnt_mask_img(img, cnt, cnt_start: Tuple[int, int] = (0, 0)):
 
     # Make mask from contour (otherwise cnt detection will find areas outside cell)
     mask = np.zeros(shape=gray.shape, dtype=np.uint8)
-    mask = cv2.drawContours(mask, cnt, -1, 255, -1)
+    mask = cv2.drawContours(mask, cnt, -1, 255, -1)  # type: ignore
 
     # Apply mask, removing detections outside of cell
     img_masked = cv2.bitwise_and(mask, gray)
@@ -234,14 +233,15 @@ def cnt_mask_img(img, cnt, cnt_start: Tuple[int, int] = (0, 0)):
 #        os.mkdir(path)
 
 
-def cell_center_detector(roi, contour, cnt_start: Tuple[int, int] = (0, 0)):
+def cell_center_detector(roi: np.ndarray[Any, np.dtype[np.generic]],
+                         contour: np.ndarray[Any, np.dtype[np.generic]],
+                         cnt_start: Tuple[int, int] = (0, 0)):
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
     # Make mask from contour (otherwise cnt detection will find areas outside cell)
-    contour = contour - cnt_start
-    contour = [contour]
+    contour = contour - np.array(cnt_start)
     mask = np.zeros(shape=gray.shape, dtype=np.uint8)
-    mask = cv2.drawContours(mask, contour, -1, 255, -1)
+    mask = cv2.drawContours(mask, [contour], -1, 255, -1)  # type: ignore
 
     # Run dynamic thresholding on image to find cell centers (white spots)
     thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
