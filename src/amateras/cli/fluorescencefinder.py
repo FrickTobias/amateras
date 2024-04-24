@@ -45,6 +45,10 @@ def add_arguments(parser):
                         default=0.6,
                         metavar="",
                         help="Min inertia for cells. Default: %(default)s")
+    parser.add_argument(
+        "--start-index", default=0, type=int,
+        help="First cell index"
+    )
 
     # TODO: Add arguments for final filtering
     # TODO: Add argument for logfile writing
@@ -56,7 +60,7 @@ def main(args):
     fluorescent_cells = find_fluorescencent_spots(
         args.input, args.n_cells, args.qc_outdir
     )
-    utils.print_to_out(fluorescent_cells, header=True)
+    utils.print_to_out(fluorescent_cells, header=True, start_index=args.start_index)
 
     # fluorescent_cells_ordered, dist = find_short_path(fluorescent_cells)
     # utils.print_to_out(fluorescent_cells_ordered, header=True)

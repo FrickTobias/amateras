@@ -73,6 +73,10 @@ def add_arguments(parser):
         "--include-area", action="store_true",
         help="Includes area in final output printing"
     )
+    parser.add_argument(
+        "--start-index", default=0, type=int,
+        help="First cell index"
+    )
 
     # TODO: Add arguments for final filtering
     # TODO: Add argument for logfile writing
@@ -87,9 +91,9 @@ def main(args):
         final_filter=args.final_filter, auto_thresh=args.auto_thresh
     )
     if args.include_area:
-        utils.print_to_out(big_cells, header=True, arealist=areas)
+        utils.print_to_out(big_cells, header=True, arealist=areas, start_index=args.start_index)
     else:
-        utils.print_to_out(big_cells, header=True)
+        utils.print_to_out(big_cells, header=True, start_index=args.start_index)
 
     # big_cells_ordered, dist = find_short_path(big_cells, args.qc_outdir)
     # utils.print_to_out(big_cells_ordered, header=True)

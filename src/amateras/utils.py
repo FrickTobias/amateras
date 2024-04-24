@@ -152,12 +152,12 @@ def filter_for_circularity(contours, circularity_threshold: float = 0.7,
 
 
 def print_to_out(sorted_coordinates: List[Tuple[int, int]], header: bool = False,
-                 arealist: List[int] = []):
+                 arealist: List[int] = [], start_index: int = 0):
     if header:
         print("No,X,Y,area") if arealist else print("No,X,Y")
     if arealist:
         for i, ((x, y), area) in enumerate(zip(sorted_coordinates, arealist)):
-            print(f"{i},{x},{y},{area}")
+            print(f"{i+start_index},{x},{y},{area}")
     else:
         for i, (x, y) in enumerate(sorted_coordinates):
-            print(f"{i},{x},{y}")
+            print(f"{i+start_index},{x},{y}")
