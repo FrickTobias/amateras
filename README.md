@@ -1,5 +1,7 @@
 [![Windows MacOS Ubuntu](https://github.com/FrickTobias/amateras/actions/workflows/tests.yml/badge.svg)](https://github.com/FrickTobias/amateras/actions/workflows/tests.yml)
 
+**Note:** This is not under active development. Therefore the fail above has not been dealt with. However, the code most likely works without issues. 
+
 # AMATERAS
 <img src=process-description.gif width="500" title="process" alt="detection process" align="center" vspace = "50">
 Image analysis for AMATERAS microscope
